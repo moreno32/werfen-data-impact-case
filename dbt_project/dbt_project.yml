@@ -1,0 +1,85 @@
+name: 'werfen_data_impact'
+version: '1.0.0'
+config-version: 2
+
+# Profile configuration
+profile: 'werfen_data_impact'
+
+# File paths configuration
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+# Clean targets
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Variables for environment-specific configurations
+vars:
+  # Data quality thresholds
+  data_quality_threshold: 0.95
+  
+  # Date boundaries for incremental models
+  start_date: '2020-01-01'
+  end_date: '2024-12-31'
+  
+  # Business logic parameters
+  foc_ratio_threshold: 0.1
+  min_transaction_threshold: 1
+
+# Model configurations by layer - ENTERPRISE ARCHITECTURE
+models:
+  werfen_data_impact:
+    # Staging layer - Raw data cleaning and standardization
+    staging:
+      +materialized: view
+      +schema: staging
+      +docs:
+        node_color: "lightblue"
+      +meta:
+        owner: "data_engineering"
+        layer: "staging"
+        description: "Raw data cleaning and standardization"
+    
+    # Intermediate layer - Business logic and transformations
+    intermediate:
+      +materialized: view
+      +schema: intermediate
+      +docs:
+        node_color: "gold"
+      +meta:
+        owner: "data_engineering"
+        layer: "intermediate"
+        description: "Business logic and complex transformations"
+    
+    # Marts layer - Analytics-ready data
+    marts:
+      +materialized: table
+      +schema: marts
+      +docs:
+        node_color: "green"
+      +meta:
+        owner: "analytics"
+        layer: "marts"
+        description: "Analytics-ready dimensional and fact tables"
+
+# Seeds configuration (commented until we have seed files)
+# seeds:
+#   werfen_data_impact:
+#     +docs:
+#       node_color: "orange"
+
+# Snapshots configuration (commented until we have snapshot files)
+# snapshots:
+#   werfen_data_impact:
+#     +docs:
+#       node_color: "purple"
+
+# Macros configuration
+dispatch:
+  - macro_namespace: dbt_utils
+    search_order: ['werfen_data_impact', 'dbt_utils'] 

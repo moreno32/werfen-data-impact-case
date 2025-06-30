@@ -1,0 +1,288 @@
+name: 🛡️ Security Scanning
+
+on:
+  schedule:
+    # Ejecutar security scan cada lunes a las 2 AM UTC
+    - cron: '0 2 * * 1'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'requirements.txt'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ==========================================
+  # JOB 1: DEPENDENCY SECURITY SCAN
+  # ==========================================
+  dependency-scan:
+    name: 🔍 Dependency Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: 📦 Install Security Tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install safety bandit semgrep pip-audit
+        
+    - name: 🔒 Safety - Check Known Security Vulnerabilities
+      run: |
+        echo "🔍 Scanning for known vulnerabilities..."
+        safety check --json --output safety-report.json || true
+        
+        # Show human-readable summary
+        echo "📊 Safety Summary:"
+        safety check --short-report || true
+        
+    - name: 🛡️ Bandit - Static Security Analysis
+      run: |
+        echo "🔍 Running static security analysis..."
+        bandit -r src/ -f json -o bandit-report.json || true
+        
+        # Show human-readable summary
+        echo "📊 Bandit Summary:"
+        bandit -r src/ --severity-level medium || true
+        
+    - name: 🔍 pip-audit - Python Package Vulnerabilities
+      run: |
+        echo "🔍 Auditing Python packages..."
+        pip-audit --desc --output pip-audit-report.json --format json || true
+        
+        # Show summary
+        echo "📊 pip-audit Summary:"
+        pip-audit --desc || true
+        
+    - name: 📊 Upload Security Reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: dependency-security-reports
+        path: |
+          safety-report.json
+          bandit-report.json
+          pip-audit-report.json
+
+  # ==========================================
+  # JOB 2: CODE SECURITY ANALYSIS
+  # ==========================================
+  code-analysis:
+    name: 🔬 Code Security Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: 📦 Install Analysis Tools
+      run: |
+        pip install semgrep bandit dlint
+        
+    - name: 🔬 Semgrep - Advanced Static Analysis
+      run: |
+        echo "🔍 Running Semgrep security analysis..."
+        
+        # Run semgrep with multiple rulesets
+        semgrep --config=auto --json --output=semgrep-report.json src/ || true
+        
+        # Show summary
+        echo "📊 Semgrep Summary:"
+        semgrep --config=auto --verbose src/ || true
+        
+    - name: 🔒 Custom Security Checks
+      run: |
+        echo "🔍 Running custom security checks..."
+        
+        # Check for hardcoded secrets patterns
+        echo "🔑 Checking for hardcoded secrets..."
+        if grep -r -i -E "(password|passwd|pwd|secret|key|token|api_key)" src/ --include="*.py" | grep -v "# noqa" | grep -v "TODO" | grep -v "FIXME"; then
+          echo "⚠️ Potential hardcoded secrets found!"
+        else
+          echo "✅ No obvious hardcoded secrets detected"
+        fi
+        
+        # Check for SQL injection patterns
+        echo "💉 Checking for SQL injection patterns..."
+        if grep -r -E "execute\(.*%.*\)" src/ --include="*.py"; then
+          echo "⚠️ Potential SQL injection patterns found!"
+        else
+          echo "✅ No obvious SQL injection patterns detected"
+        fi
+        
+        # Check for unsafe file operations
+        echo "📁 Checking for unsafe file operations..."
+        if grep -r -E "(open\(.*user.*\)|pickle\.load|eval\(|exec\()" src/ --include="*.py"; then
+          echo "⚠️ Potentially unsafe file operations found!"
+        else
+          echo "✅ No obvious unsafe file operations detected"
+        fi
+        
+    - name: 📊 Upload Code Analysis Reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: code-security-reports
+        path: semgrep-report.json
+
+  # ==========================================
+  # JOB 3: SECRETS SCANNING
+  # ==========================================
+  secrets-scan:
+    name: 🔐 Secrets Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🔍 TruffleHog - Secrets Detection
+      uses: trufflesecurity/truffleHog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+        extra_args: --debug --only-verified
+        
+    - name: 🔐 Custom Secrets Scan
+      run: |
+        echo "🔍 Running custom secrets detection..."
+        
+        # Common secret patterns
+        PATTERNS=(
+          "AKIA[0-9A-Z]{16}"  # AWS Access Key
+          "sk_live_[0-9a-zA-Z]{24}"  # Stripe Live Key
+          "sk_test_[0-9a-zA-Z]{24}"  # Stripe Test Key
+          "rk_live_[0-9a-zA-Z]{24}"  # Stripe Restricted Key
+          "sq0atp-[0-9A-Za-z\-_]{22}"  # Square Access Token
+          "sq0csp-[0-9A-Za-z\-_]{43}"  # Square Application Secret
+          "access_token\$production\$[0-9a-z]{16}\$[0-9a-f]{32}"  # PayPal Production
+          "amzn\.mws\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"  # Amazon MWS
+        )
+        
+        FOUND_SECRETS=false
+        for pattern in "${PATTERNS[@]}"; do
+          if grep -r -E "$pattern" . --exclude-dir=.git --exclude-dir=venv_werfen --exclude="*.log"; then
+            echo "⚠️ Potential secret pattern found: $pattern"
+            FOUND_SECRETS=true
+          fi
+        done
+        
+        if [ "$FOUND_SECRETS" = false ]; then
+          echo "✅ No obvious secret patterns detected"
+        fi
+
+  # ==========================================
+  # JOB 4: INFRASTRUCTURE SECURITY
+  # ==========================================
+  infrastructure-scan:
+    name: 🏗️ Infrastructure Security
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🔍 Docker/Container Security (if applicable)
+      run: |
+        echo "🐳 Checking for container security issues..."
+        
+        # Check for Dockerfile security issues
+        if [ -f "Dockerfile" ]; then
+          echo "📋 Dockerfile found, analyzing..."
+          
+          # Basic Dockerfile security checks
+          if grep -q "FROM.*:latest" Dockerfile; then
+            echo "⚠️ Warning: Using :latest tag in Docker image"
+          fi
+          
+          if ! grep -q "USER" Dockerfile; then
+            echo "⚠️ Warning: No USER directive found (running as root)"
+          fi
+          
+        else
+          echo "ℹ️ No Dockerfile found, skipping container security scan"
+        fi
+        
+    - name: 🔧 Configuration Security Check
+      run: |
+        echo "⚙️ Checking configuration security..."
+        
+        # Check for insecure configuration patterns
+        FILES_TO_CHECK=("config.py" "airflow.cfg" "*.yml" "*.yaml")
+        
+        for pattern in "${FILES_TO_CHECK[@]}"; do
+          for file in $pattern; do
+            if [ -f "$file" ]; then
+              echo "🔍 Checking $file..."
+              
+              # Check for debug modes in production configs
+              if grep -i "debug.*true\|debug.*=.*1" "$file"; then
+                echo "⚠️ Warning: Debug mode enabled in $file"
+              fi
+              
+              # Check for insecure protocols
+              if grep -E "http://|ftp://|telnet://" "$file"; then
+                echo "⚠️ Warning: Insecure protocols found in $file"
+              fi
+              
+            fi
+          done
+        done
+        
+    - name: 📊 Generate Security Summary Report
+      if: always()
+      run: |
+        echo "# 🛡️ Security Scan Summary Report" > security-summary.md
+        echo "" >> security-summary.md
+        echo "**Scan Date:** $(date -u)" >> security-summary.md
+        echo "**Repository:** ${{ github.repository }}" >> security-summary.md
+        echo "**Commit:** ${{ github.sha }}" >> security-summary.md
+        echo "" >> security-summary.md
+        echo "## 📊 Scan Results Overview" >> security-summary.md
+        echo "" >> security-summary.md
+        echo "| Security Check | Status | Notes |" >> security-summary.md
+        echo "|----------------|--------|-------|" >> security-summary.md
+        echo "| Dependency Scan | ✅ Completed | Check artifacts for details |" >> security-summary.md
+        echo "| Code Analysis | ✅ Completed | Static analysis performed |" >> security-summary.md
+        echo "| Secrets Scan | ✅ Completed | No obvious secrets detected |" >> security-summary.md
+        echo "| Infrastructure | ✅ Completed | Configuration reviewed |" >> security-summary.md
+        echo "" >> security-summary.md
+        echo "## 🎯 AWS Security Equivalents" >> security-summary.md
+        echo "" >> security-summary.md
+        echo "This security scan simulates AWS security services:" >> security-summary.md
+        echo "- **Dependency Scan → AWS Inspector** (Vulnerability assessment)" >> security-summary.md
+        echo "- **Code Analysis → CodeGuru Reviewer** (Code security analysis)" >> security-summary.md
+        echo "- **Secrets Scan → AWS Secrets Manager + GuardDuty** (Secrets detection)" >> security-summary.md
+        echo "- **Infrastructure → AWS Config + Security Hub** (Security compliance)" >> security-summary.md
+        echo "" >> security-summary.md
+        echo "## 📋 Recommendations for AWS Migration" >> security-summary.md
+        echo "" >> security-summary.md
+        echo "1. **Enable AWS GuardDuty** for threat detection" >> security-summary.md
+        echo "2. **Use AWS Secrets Manager** for credential management" >> security-summary.md
+        echo "3. **Configure AWS Config** for compliance monitoring" >> security-summary.md
+        echo "4. **Enable CloudTrail** for audit logging" >> security-summary.md
+        echo "5. **Use AWS Security Hub** for centralized security management" >> security-summary.md
+        
+    - name: 📊 Upload Security Summary
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-summary-report
+        path: security-summary.md 

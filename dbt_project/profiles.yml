@@ -1,0 +1,23 @@
+werfen_data_impact:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "../artifacts/werfen.db"
+      threads: 4
+      keepalives_idle: 0
+      search_path: "main"
+      
+    prod:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PROD_PATH', '../artifacts/werfen_data_impact_prod.db') }}"
+      threads: 8
+      keepalives_idle: 0
+      search_path: "main"
+      
+    test:
+      type: duckdb
+      path: ":memory:"
+      threads: 2
+      keepalives_idle: 0
+      search_path: "main"
