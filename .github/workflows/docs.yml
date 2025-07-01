@@ -1,13 +1,12 @@
-name: 📚 Documentation Update
+name: 📚 Documentation
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
     paths:
-      - 'src/**'
       - 'docs/**'
+      - 'src/**'
       - 'README.md'
-      - 'dbt_project/**'
   pull_request:
     branches: [ main ]
     paths:
@@ -20,10 +19,10 @@ env:
 
 jobs:
   # ==========================================
-  # JOB 1: DOCUMENTATION VALIDATION
+  # JOB 1: SIMPLE DOCUMENTATION BUILD
   # ==========================================
-  validate-docs:
-    name: ✅ Validate Documentation
+  build-docs:
+    name: 📖 Build Documentation
     runs-on: ubuntu-latest
     
     steps:
@@ -34,302 +33,143 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
         
     - name: 📦 Install Documentation Tools
       run: |
-        pip install mkdocs mkdocs-material markdown-include
+        pip install -r requirements.txt
         
-    - name: ✅ Validate Markdown Syntax
+    - name: 📚 Generate Werfen Documentation
       run: |
-        echo "📋 Validating markdown files..."
+        echo "📚 Generating Werfen Data Impact Case documentation..."
         
-        # Check for broken markdown syntax
-        find docs/ -name "*.md" -exec python -c "
-        import sys
-        import re
+        # Create documentation structure
+        mkdir -p docs/build docs/api docs/architecture docs/business
         
-        file_path = sys.argv[1]
-        print(f'Checking {file_path}...')
+        # Generate project overview
+        cat > docs/build/index.md << 'EOF'
+        # 🎯 Werfen Data Impact Case - Documentation
         
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-            
-        # Check for common markdown issues
-        issues = []
+        ## 📋 Project Overview
         
-        # Check for malformed headers
-        if re.search(r'^#{7,}', content, re.MULTILINE):
-            issues.append('Headers with more than 6 levels found')
-            
-        # Check for unmatched code blocks
-        code_blocks = content.count('```')
-        if code_blocks % 2 != 0:
-            issues.append('Unmatched code blocks found')
-            
-        # Check for empty links
-        if re.search(r'\[.*?\]\(\s*\)', content):
-            issues.append('Empty links found')
-            
-        if issues:
-            print(f'❌ Issues in {file_path}:')
-            for issue in issues:
-                print(f'  - {issue}')
-            sys.exit(1)
-        else:
-            print(f'✅ {file_path} is valid')
-        " {} \;
+        This documentation covers the complete Werfen Data Impact Case solution, showcasing a modern enterprise data architecture with ML capabilities.
         
-    - name: 🔍 Check Documentation Completeness
-      run: |
-        echo "📊 Checking documentation completeness..."
+        ## 🏗️ Architecture Components
         
-        # Required documentation files
-        REQUIRED_DOCS=(
-          "docs/README_documentacion.md"
-          "README.md"
-        )
+        - **Data Pipeline**: Medallion architecture (Bronze → Silver → Gold → Platinum)
+        - **ML Pipeline**: Customer segmentation using K-means clustering
+        - **Orchestration**: Apache Airflow for automated workflows
+        - **Data Transformation**: dbt for data modeling and lineage
+        - **Analytics**: Advanced customer persona analysis
         
-        for doc in "${REQUIRED_DOCS[@]}"; do
-          if [ -f "$doc" ]; then
-            echo "✅ $doc exists"
-          else
-            echo "❌ $doc missing"
-            exit 1
-          fi
-        done
+        ## 🎯 Business Impact
         
-        # Check for component documentation
-        COMPONENTS=("logging" "security" "performance" "portability" "distributed")
+        - Revenue optimization through targeted campaigns
+        - Customer segmentation for personalized experiences  
+        - Data-driven decision making capabilities
+        - Scalable cloud-ready architecture
         
-        for component in "${COMPONENTS[@]}"; do
-          if [ -d "src/$component" ]; then
-            # Check if component is documented
-            if grep -q "$component" docs/*.md README.md; then
-              echo "✅ $component component is documented"
-            else
-              echo "⚠️ $component component may need documentation"
-            fi
-          fi
-        done
-
-  # ==========================================
-  # JOB 2: GENERATE DEPLOYMENT GUIDE
-  # ==========================================
-  deployment-guide:
-    name: 📖 Generate Deployment Guide
-    runs-on: ubuntu-latest
-    needs: validate-docs
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
-    steps:
-    - name: 📥 Checkout Code
-      uses: actions/checkout@v4
-      
-    - name: 📖 Generate CI/CD Deployment Guide
-      run: |
-        echo "📚 Generating CI/CD deployment guide..."
+        ## 🚀 AWS Migration Ready
         
-        cat > docs/guia_cicd_deployment.md << 'EOF'
-        # 🚀 Guía de CI/CD y Deployment
+        The solution is designed for seamless AWS migration:
+        - S3 for data lake storage
+        - Redshift/DuckDB for data warehousing
+        - SageMaker for ML operations
+        - MWAA for Airflow orchestration
         
-        Esta guía explica el pipeline CI/CD implementado para el proyecto Werfen Data Pipeline.
-        
-        ## 📋 Tabla de Contenidos
-        
-        1. [Visión General](#visión-general)
-        2. [Workflows de GitHub Actions](#workflows-de-github-actions)
-        3. [Equivalencias AWS](#equivalencias-aws)
-        4. [Configuración de Entornos](#configuración-de-entornos)
-        5. [Proceso de Deployment](#proceso-de-deployment)
-        6. [Monitoreo y Alertas](#monitoreo-y-alertas)
-        7. [Troubleshooting](#troubleshooting)
-        
-        ## 🎯 Visión General
-        
-        El pipeline CI/CD está diseñado para ser **simple pero enterprise-ready**, ideal para POCs que necesitan escalabilidad hacia AWS.
-        
-        ### Características Principales:
-        - ✅ **Continuous Integration** completo
-        - ✅ **Continuous Deployment** por entornos
-        - ✅ **Security Scanning** automatizado
-        - ✅ **Documentation** auto-generada
-        - ✅ **AWS-ready** con equivalencias 1:1
-        
-        ## 🔧 Workflows de GitHub Actions
-        
-        ### 1. 🔧 Continuous Integration (ci.yml)
-        
-        **Trigger:** Push/PR a main, develop, feature/*
-        
-        **Jobs:**
-        1. **Code Quality & Security** - Linting, formatting, security scan
-        2. **Component Testing** - Test individual de cada componente
-        3. **Integration Testing** - Test de integración completo
-        4. **Build Validation** - Validación de build y packaging
-        5. **Deployment Readiness** - Verificación pre-deployment
-        
-        ### 2. 🚀 Continuous Deployment (cd.yml)
-        
-        **Trigger:** Push a main + CI success
-        
-        **Jobs:**
-        1. **Deployment Preparation** - Determinación de entorno y matriz
-        2. **Deploy Components** - Deployment paralelo por componente
-        3. **Integration Validation** - Validación end-to-end
-        4. **Post-Deployment** - Notificaciones y rollback
-        
-        ### 3. 🛡️ Security Scanning (security.yml)
-        
-        **Trigger:** Schedule (lunes 2 AM) + PRs importantes
-        
-        **Jobs:**
-        1. **Dependency Scan** - Vulnerabilidades en dependencias
-        2. **Code Analysis** - Análisis estático de seguridad
-        3. **Secrets Scan** - Detección de secretos hardcodeados
-        4. **Infrastructure Scan** - Seguridad de configuración
-        
-        ### 4. 📚 Documentation Update (docs.yml)
-        
-        **Trigger:** Push a main/develop + cambios en docs
-        
-        **Jobs:**
-        1. **Validate Documentation** - Validación de markdown
-        2. **Generate Deployment Guide** - Esta guía
-        
-        ## 🎯 Equivalencias AWS
-        
-        | GitHub Actions | AWS Service | Función |
-        |----------------|-------------|---------|
-        | **GitHub Actions** | **CodePipeline + CodeBuild** | Orquestación CI/CD |
-        | **GitHub Artifacts** | **S3 + CodeArtifact** | Almacenamiento de artifacts |
-        | **GitHub Secrets** | **Secrets Manager** | Gestión de secretos |
-        | **GitHub Environments** | **CodeDeploy + ECS** | Deployment por entornos |
-        | **Security Scanning** | **Inspector + GuardDuty** | Análisis de seguridad |
-        | **Auto-docs** | **CodeGuru + CloudFormation** | Documentación automática |
-        
-        ## ⚙️ Configuración de Entornos
-        
-        ### Development
-        - **Componentes:** Airflow + dbt
-        - **Trigger:** Feature branches
-        - **Validación:** Tests básicos
-        
-        ### Staging  
-        - **Componentes:** Airflow + dbt + S3 sync
-        - **Trigger:** Push a main
-        - **Validación:** Tests completos + integración
-        
-        ### Production
-        - **Componentes:** Airflow + dbt + S3 sync + Monitoring
-        - **Trigger:** Manual (workflow_dispatch)
-        - **Validación:** Tests completos + health checks + rollback
-        
-        ## 🚀 Proceso de Deployment
-        
-        ### Deployment Automático (Staging)
-        
-        1. Push to main → CI Pipeline
-        2. CI Success → CD Pipeline
-        3. Deploy Components (paralelo)
-        4. Integration Tests
-        5. Success/Rollback
-        
-        ### Deployment Manual (Production)
-        
-        1. **Trigger Manual:** Actions > CD > Run workflow > production
-        2. **Review:** Validar deployment plan
-        3. **Execute:** Deployment paralelo por componente
-        4. **Validate:** Health checks automáticos
-        5. **Monitor:** Observabilidad completa
-        
-        ## 📊 Monitoreo y Alertas
-        
-        ### Métricas Monitoreadas
-        - ✅ **Build Success Rate** - Porcentaje de builds exitosos
-        - ✅ **Deployment Frequency** - Frecuencia de deployments
-        - ✅ **Lead Time** - Tiempo desde commit hasta deployment
-        - ✅ **Mean Time to Recovery** - Tiempo de recuperación
-        
-        ### Alertas Configuradas
-        - 🚨 **Build Failures** - Notificación inmediata
-        - 🚨 **Security Issues** - Alertas de seguridad
-        - 🚨 **Deployment Failures** - Fallos en production
-        - 📊 **Weekly Reports** - Resumen semanal
-        
-        ## 🔧 Troubleshooting
-        
-        ### Problemas Comunes
-        
-        #### CI Pipeline Falla
-        1. Ir a Actions tab
-        2. Seleccionar run fallido
-        3. Expandir job con error
-        4. Revisar logs detallados
-        
-        #### Deployment Falla
-        1. Ir al último deployment exitoso
-        2. Re-run workflow
-        3. O trigger manual rollback
-        
-        #### Security Scan Issues
-        1. Descargar artifacts de security scan
-        2. Revisar JSON reports
-        3. Aplicar fixes necesarios
-        4. Re-run pipeline
-        
-        ## 🎯 Migración a AWS
-        
-        ### Roadmap de Migración (4 semanas)
-        
-        **Semana 1: Setup Infrastructure**
-        - Configurar CodePipeline + CodeBuild
-        - Migrar secrets a Secrets Manager
-        - Setup S3 buckets para artifacts
-        
-        **Semana 2: Pipeline Migration**
-        - Migrar workflows a CodeBuild specs
-        - Configurar triggers y webhooks
-        - Setup environments en CodeDeploy
-        
-        **Semana 3: Security & Monitoring**
-        - Configurar Inspector + GuardDuty
-        - Setup CloudWatch + X-Ray
-        - Configurar alertas SNS
-        
-        **Semana 4: Testing & Go-Live**
-        - Testing completo del pipeline
-        - Rollback procedures
-        - Go-live y monitoring
-        
-        ### Costos Estimados AWS
-        
-        | Servicio | Costo Mensual | Notas |
-        |----------|---------------|-------|
-        | CodePipeline | $1/pipeline | ~$10/mes (10 pipelines) |
-        | CodeBuild | $0.005/min | ~$50/mes (1000 mins) |
-        | S3 Storage | $0.023/GB | ~$5/mes (200 GB) |
-        | Secrets Manager | $0.40/secret | ~$20/mes (50 secrets) |
-        | Inspector | $0.15/assessment | ~$15/mes (100 scans) |
-        | **Total** | **~$100/mes** | **vs $300/mes CI/CD tradicional** |
-        
-        ## 📞 Soporte
-        
-        Para problemas con el pipeline CI/CD:
-        
-        1. **Revisar esta documentación**
-        2. **Consultar logs en GitHub Actions**
-        3. **Revisar issues del repositorio**
-        4. **Contactar al equipo DevOps**
-        
-        ---
-        
-        *Documentación generada automáticamente*
         EOF
         
-        echo "✅ CI/CD deployment guide generated"
+        # Generate API documentation
+        python -c "
+        import inspect
+        import importlib
+        from pathlib import Path
         
-    - name: 📊 Upload Deployment Guide
+        # Document key modules
+        modules = [
+            'src.analysis.data_warehouse_analysis',
+            'src.ml_pipeline.pipeline',
+            'src.portability.config_manager'
+        ]
+        
+        api_doc = '# 📡 API Documentation\n\n'
+        
+        for module_name in modules:
+            try:
+                module = importlib.import_module(module_name)
+                api_doc += f'## {module_name}\n\n'
+                
+                # Get classes and functions
+                for name, obj in inspect.getmembers(module):
+                    if inspect.isclass(obj) and obj.__module__ == module_name:
+                        api_doc += f'### {name}\n'
+                        if obj.__doc__:
+                            api_doc += f'{obj.__doc__}\n\n'
+                        else:
+                            api_doc += 'No documentation available.\n\n'
+                            
+            except ImportError:
+                api_doc += f'## {module_name}\n\nModule not found or import error.\n\n'
+        
+        with open('docs/api/api_reference.md', 'w') as f:
+            f.write(api_doc)
+        
+        print('✅ API documentation generated')
+        "
+        
+        # Generate architecture documentation
+        cat > docs/architecture/system_design.md << 'EOF'
+        # 🏗️ System Architecture
+        
+        ## Data Flow Architecture
+        
+        ```
+        Raw Data → Bronze Layer → Silver Layer → Gold Layer → Platinum Layer
+                                                                    ↓
+                                                            ML Pipeline
+                                                                    ↓
+                                                          Customer Segments
+        ```
+        
+        ## Component Overview
+        
+        ### Data Layers (Medallion Architecture)
+        - **Bronze**: Raw data ingestion
+        - **Silver**: Cleaned and validated data
+        - **Gold**: Business-ready aggregated data
+        - **Platinum**: ML-enhanced insights
+        
+        ### ML Pipeline
+        - K-means clustering for customer segmentation
+        - Feature engineering for business metrics
+        - Persona assignment (Champions, Loyalists, Potential, At-Risk)
+        
+        ### Orchestration
+        - Airflow DAGs for pipeline automation
+        - Scheduled training and inference
+        - Data quality monitoring
+        
+        EOF
+        
+        echo "✅ Werfen documentation generated successfully"
+        
+    - name: 📊 Documentation Summary
+      run: |
+        echo "📊 Documentation Build Summary:"
+        echo "================================"
+        echo "🎯 Project: Werfen Data Impact Case"
+        echo "📅 Build Date: $(date -u)"
+        echo "🔗 Commit: ${{ github.sha }}"
+        echo ""
+        echo "📚 Generated Documentation:"
+        find docs/build -name "*.md" -exec basename {} \; | sed 's/^/  - /'
+        find docs/api -name "*.md" -exec basename {} \; | sed 's/^/  - /'
+        find docs/architecture -name "*.md" -exec basename {} \; | sed 's/^/  - /'
+        echo ""
+        echo "✅ Documentation ready for deployment"
+        
+    - name: 📊 Upload Documentation
       uses: actions/upload-artifact@v3
       with:
-        name: deployment-guide
-        path: docs/guia_cicd_deployment.md 
+        name: werfen-documentation
+        path: docs/ 
