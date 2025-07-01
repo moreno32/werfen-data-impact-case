@@ -1793,24 +1793,24 @@ class DataWarehouseAnalyzer:
 
 
 def main():
-    """Función principal para demostración"""
+    """Main function for demonstration"""
     print("🏗️ WERFEN DATA WAREHOUSE ANALYZER")
     print("=" * 50)
     
     analyzer = DataWarehouseAnalyzer()
     
-    # Demostración de funcionalidades
-    print("\n1️⃣ MOSTRAR ESTRUCTURA DEL DW")
+    # Functionality demonstration
+    print("\n1️⃣ SHOW DW STRUCTURE")
     analyzer.show_dw_structure()
     
-    print("\n2️⃣ MOSTRAR TABLAS DISPONIBLES")
+    print("\n2️⃣ SHOW AVAILABLE TABLES")
     analyzer.show_available_tables()
     
-    print("\n3️⃣ ANÁLISIS DE TABLA EJEMPLO")
+    print("\n3️⃣ EXAMPLE TABLE ANALYSIS")
     analyzer.analyze_table_metadata('raw_customer', 'raw', show_sample=True, sample_size=3)
     
-    print("\n✅ Demostración completada")
-    print("\n💡 Para usar en notebook:")
+    print("\n✅ Demonstration completed")
+    print("\n💡 To use in notebook:")
     print("   from scripts.data_warehouse_analysis import DataWarehouseAnalyzer")
     print("   analyzer = DataWarehouseAnalyzer()")
     print("   analyzer.run_ingestion_pipeline()")
