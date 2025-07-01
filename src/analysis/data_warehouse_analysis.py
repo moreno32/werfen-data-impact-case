@@ -1623,29 +1623,29 @@ class DataWarehouseAnalyzer:
         try:
             import json
             
-            # Rutas a archivos de metadatos de dbt
+            # Paths to dbt metadata files
             manifest_path = self.config.dbt_project_folder / "target" / "manifest.json"
             catalog_path = self.config.dbt_project_folder / "target" / "catalog.json"
             
-            # Verificar si existen los archivos
+            # Check if files exist
             if not manifest_path.exists():
-                print(f"⚠️  Archivo manifest.json no encontrado en: {manifest_path}")
-                print("💡 Ejecuta 'dbt compile' o 'dbt run' para generar metadatos")
+                print(f"⚠️  manifest.json file not found at: {manifest_path}")
+                print("💡 Run 'dbt compile' or 'dbt run' to generate metadata")
                 return {}
             
-            # Leer manifest.json (contiene definiciones de modelos, tests, docs)
+            # Read manifest.json (contains model definitions, tests, docs)
             with open(manifest_path, 'r', encoding='utf-8') as f:
                 manifest = json.load(f)
             
-            # Leer catalog.json si existe (contiene estadísticas de tablas)
+            # Read catalog.json if it exists (contains table statistics)
             catalog = {}
             if catalog_path.exists():
                 with open(catalog_path, 'r', encoding='utf-8') as f:
                     catalog = json.load(f)
             else:
-                print(f"⚠️  Archivo catalog.json no encontrado. Ejecuta 'dbt docs generate'")
+                print(f"⚠️  catalog.json file not found. Run 'dbt docs generate'")
             
-            # Procesar modelos desde manifest
+            # Process models from manifest
             models = manifest.get('nodes', {})
             
             for node_id, node_info in models.items():
@@ -1655,17 +1655,17 @@ class DataWarehouseAnalyzer:
                     schema = node_info.get('schema', 'main')
                     description = node_info.get('description', '')
                     
-                    # Obtener metadatos del catalog si está disponible
+                    # Get catalog metadata if available
                     catalog_key = f"model.werfen_data_impact.{model_name}"
                     table_stats = catalog.get('nodes', {}).get(catalog_key, {}).get('stats', {})
                     
-                    # Extraer estadísticas
+                    # Extract statistics
                     row_count = 0
                     for stat_name, stat_info in table_stats.items():
                         if stat_name == 'row_count':
                             row_count = stat_info.get('value', 0)
                     
-                    # Obtener tests asociados
+                    # Get associated tests
                     tests = []
                     for test_id, test_info in manifest.get('nodes', {}).items():
                         if (test_info.get('resource_type') == 'test' and 
@@ -1673,7 +1673,7 @@ class DataWarehouseAnalyzer:
                             test_name = test_info.get('test_metadata', {}).get('name', 'test')
                             tests.append(test_name)
                     
-                    # Obtener dependencias
+                    # Get dependencies
                     depends_on = node_info.get('depends_on', {}).get('nodes', [])
                     dependencies = []
                     for dep in depends_on:
@@ -1681,7 +1681,7 @@ class DataWarehouseAnalyzer:
                             dep_name = dep.split('.')[-1]
                             dependencies.append(dep_name)
                     
-                    # Determinar capa basada en el directorio del modelo
+                    # Determine layer based on model directory
                     model_path = node_info.get('original_file_path', '')
                     if 'staging' in model_path:
                         layer = 'Staging'
@@ -1696,12 +1696,12 @@ class DataWarehouseAnalyzer:
                         layer = 'Unknown'
                         layer_schema = schema
                     
-                    # Crear metadatos enriquecidos
+                    # Create enriched metadata
                     dbt_metadata[model_name] = {
                         'name': model_name,
                         'schema': layer_schema,
                         'layer': layer,
-                        'description': description or f"Modelo dbt - {model_name}",
+                        'description': description or f"dbt Model - {model_name}",
                         'row_count': row_count,
                         'tests': tests,
                         'dependencies': dependencies,
@@ -1712,11 +1712,11 @@ class DataWarehouseAnalyzer:
                         'source': 'dbt_manifest'
                     }
             
-            print(f"✅ Metadatos dbt cargados: {len(dbt_metadata)} modelos")
+            print(f"✅ dbt metadata loaded: {len(dbt_metadata)} models")
             
         except Exception as e:
-            print(f"❌ Error cargando metadatos dbt: {e}")
-            print("💡 Asegúrate de que dbt esté configurado y haya ejecutado 'dbt compile'")
+            print(f"❌ Error loading dbt metadata: {e}")
+            print("💡 Make sure dbt is configured and 'dbt compile' has been run")
             return {}
         
         return dbt_metadata
@@ -1751,7 +1751,7 @@ class DataWarehouseAnalyzer:
             if layer in layers:
                 layers[layer].append((table_name, metadata))
         
-        # Mostrar por capa
+        # Display by layer
         layer_icons = {
             'Raw': '🔴',
             'Staging': '🟡', 
@@ -1769,15 +1769,15 @@ class DataWarehouseAnalyzer:
                 
                 for table_name, metadata in tables:
                     print(f"\n📊 {table_name}")
-                    print(f"   🎯 Descripción: {metadata['description']}")
-                    print(f"   📏 Materialización: {metadata['materialization']}")
-                    print(f"   📈 Registros: {metadata['row_count']:,} (desde catalog)")
+                    print(f"   🎯 Description: {metadata['description']}")
+                    print(f"   📏 Materialization: {metadata['materialization']}")
+                    print(f"   📈 Records: {metadata['row_count']:,} (from catalog)")
                     
                     if metadata['tests']:
-                        print(f"   🧪 Tests dbt: {', '.join(metadata['tests'])}")
+                        print(f"   🧪 dbt Tests: {', '.join(metadata['tests'])}")
                     
                     if metadata['dependencies']:
-                        print(f"   📦 Dependencias: {', '.join(metadata['dependencies'])}")
+                        print(f"   📦 Dependencies: {', '.join(metadata['dependencies'])}")
                     
                     if metadata['tags']:
                         print(f"   🏷️  Tags: {', '.join(metadata['tags'])}")
@@ -1785,10 +1785,10 @@ class DataWarehouseAnalyzer:
                 print()
         
         print("=" * 70)
-        print("💡 METADATOS DESDE DBT:")
-        print("   📄 Fuente: manifest.json + catalog.json")
-        print("   🔄 Para actualizar: dbt compile && dbt docs generate")
-        print("   📊 Tests y dependencias: Reales desde dbt")
+        print("💡 DBT METADATA:")
+        print("   📄 Source: manifest.json + catalog.json")
+        print("   🔄 To update: dbt compile && dbt docs generate")
+        print("   📊 Tests and dependencies: Real from dbt")
         print("=" * 70)
 
 
